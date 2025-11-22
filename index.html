@@ -22,7 +22,6 @@
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
 
-    <!-- Header -->
     <header class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
         <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
             <div class="flex items-center gap-4">
@@ -49,7 +48,6 @@
         </div>
     </header>
 
-    <!-- Difficulty & Controls Bar -->
     <div class="bg-white border-b border-slate-200 shadow-sm">
         <div class="max-w-4xl mx-auto px-4 py-2 flex flex-wrap justify-between items-center text-sm">
             <div class="flex items-center space-x-2 mb-2 sm:mb-0">
@@ -75,48 +73,38 @@
         </div>
     </div>
 
-    <!-- Main Content -->
     <main class="flex-grow flex flex-col items-center justify-start pt-8 px-4 pb-12 relative">
         <div class="w-full max-w-3xl">
             
-            <!-- Progress Bar -->
             <div class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
                 <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
             </div>
 
-            <!-- AI Indicator -->
             <div id="ai-indicator" class="hidden mb-2 text-right text-xs font-semibold text-purple-600 flex items-center justify-end gap-1">
                 <i class="fas fa-robot"></i> AI Generated
             </div>
 
-            <!-- Question Card -->
             <div id="quiz-container" class="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200 fade-in relative min-h-[400px]">
                 
-                <!-- Loading Overlay -->
                 <div id="loading-overlay" class="absolute inset-0 bg-white/90 z-10 flex flex-col items-center justify-center hidden">
                     <div class="loader mb-3"></div>
                     <p class="text-slate-500 text-sm animate-pulse">Consulting the Guidelines...</p>
                 </div>
 
-                <!-- Chapter Tag -->
                 <div class="bg-slate-50 px-6 py-3 border-b border-slate-100 flex justify-between items-center">
-                    <span id="chapter-tag" class="text-xs font-bold tracking-wider text-slate-500 uppercase">Chapter I</span>
+                    <span id="chapter-tag" class="text-xs font-bold tracking-wider text-slate-500 uppercase">Start Quiz</span>
                     <span id="question-count" class="text-xs text-slate-400">Question 1</span>
                 </div>
 
-                <!-- Question Text -->
                 <div class="p-6 sm:p-8">
                     <h2 id="question-text" class="text-xl sm:text-2xl font-semibold text-slate-800 mb-6 leading-relaxed">
-                        Loading question...
+                        Initializing...
                     </h2>
 
-                    <!-- Options -->
                     <div id="options-container" class="space-y-3">
-                        <!-- Options injected by JS -->
-                    </div>
+                        </div>
                 </div>
 
-                <!-- Feedback / Explanation Section (Hidden by default) -->
                 <div id="feedback-section" class="hidden bg-slate-50 border-t border-slate-200 p-6 sm:p-8">
                     <div class="flex items-start space-x-3 mb-4">
                         <div id="feedback-icon" class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white"></div>
@@ -134,7 +122,6 @@
         </div>
     </main>
 
-    <!-- Settings Modal -->
     <div id="settings-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center px-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all">
             <div class="flex justify-between items-center mb-4">
@@ -146,7 +133,7 @@
                 <label class="block text-sm font-medium text-slate-700 mb-2">Google Gemini API Key</label>
                 <input type="password" id="api-key-input" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Enter your API Key here...">
                 <p class="text-xs text-slate-500 mt-2">
-                    Leave empty to use the built-in offline question bank. 
+                    An API Key is required to generate questions. 
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Get a key here.</a>
                 </p>
             </div>
@@ -157,18 +144,15 @@
         </div>
     </div>
 
-    <!-- Footer -->
     <footer class="bg-white border-t border-slate-200 py-6 mt-auto">
         <div class="max-w-4xl mx-auto px-4 text-center text-slate-500 text-sm">
             <p>Based on the <a href="https://www.oecd.org/tax/transfer-pricing/oecd-transfer-pricing-guidelines-for-multinational-enterprises-and-tax-administrations-20769717.htm" target="_blank" class="text-blue-600 hover:underline">OECD Transfer Pricing Guidelines 2022</a>.</p>
-            <p class="mt-1">Covers Chapters I-X. Excludes Annexes.</p>
+            <p class="mt-1">Powered by Google Gemini.</p>
         </div>
     </footer>
 
     <script>
         // --- USER CONFIGURATION ---
-        // PASTE YOUR API KEY INSIDE THE QUOTES BELOW
-        // WARNING: If you host this publicly, this key will be visible in the source code.
         const HARDCODED_API_KEY = ""; 
 
         // --- Configuration & State ---
@@ -180,175 +164,13 @@
             questionCount: 0,
             consecutiveCorrect: 0,
             consecutiveWrong: 0,
-            apiKey: HARDCODED_API_KEY || localStorage.getItem('oecd_quiz_api_key') || 'AIzaSyABDqPKFLzetjIRlD_G8Iln66DmTR3IiNE',
-            isUsingAI: false
+            apiKey: HARDCODED_API_KEY || localStorage.getItem('oecd_quiz_api_key') || '',
+            isUsingAI: false,
+            seenQuestions: [] // Tracks IDs
         };
 
-        // --- Question Bank (Fallback) ---
-        const localQuestions = [
-            {
-                id: 1,
-                chapter: "Chapter I",
-                difficulty: 1,
-                question: "Which article of the OECD Model Tax Convention forms the authoritative statement of the arm's length principle?",
-                options: ["Article 7", "Article 9", "Article 5", "Article 24"],
-                correct: 1,
-                explanation: "Paragraph 1 of Article 9 of the OECD Model Tax Convention is the foundation for the arm's length principle, allowing for adjustment of profits when conditions differ from those between independent enterprises."
-            },
-            {
-                id: 2,
-                chapter: "Chapter I",
-                difficulty: 2,
-                question: "In the 2022 Guidelines, if a funder lacks the capability to control the risk associated with investing in a financial asset, what return is it generally entitled to?",
-                options: ["The full residual profit", "A risk-adjusted rate of return", "No return at all", "A risk-free rate of return"],
-                correct: 3,
-                explanation: "Under the guidance on risk (Chapter I & X), a capital-rich entity that does not exercise control over the financial risks is generally entitled to no more than a risk-free return on its funding."
-            },
-            {
-                id: 3,
-                chapter: "Chapter I",
-                difficulty: 3,
-                question: "When delineating a transaction, if the contractual terms are inconsistent with the conduct of the parties, which should be prioritized?",
-                options: ["The contractual terms always prevail", "The conduct of the parties", "The Master File description", "The local accounting standards"],
-                correct: 1,
-                explanation: "The accurate delineation of the transaction requires analyzing the conduct. Where conduct differs from contracts, the conduct indicates the actual commercial financial relations."
-            },
-            {
-                id: 4,
-                chapter: "Chapter II",
-                difficulty: 1,
-                question: "Which of the following is NOT a 'Traditional Transaction Method' as defined by the OECD?",
-                options: ["Comparable Uncontrolled Price (CUP)", "Resale Price Method", "Transactional Net Margin Method (TNMM)", "Cost Plus Method"],
-                correct: 2,
-                explanation: "TNMM and Profit Split are 'Transactional Profit Methods'. CUP, Resale Price, and Cost Plus are 'Traditional Transaction Methods'."
-            },
-            {
-                id: 5,
-                chapter: "Chapter II",
-                difficulty: 2,
-                question: "According to the 2022 revisions, when is the Transactional Profit Split Method (PSM) likely the 'most appropriate method'?",
-                options: ["When one party performs simple functions", "When reliable comparables are easily available", "When both parties make unique and valuable contributions", "Whenever intangibles are involved"],
-                correct: 2,
-                explanation: "The PSM is most appropriate when both parties make unique and valuable contributions, operations are highly integrated, or risks are economically significant and shared."
-            },
-            {
-                id: 6,
-                chapter: "Chapter III",
-                difficulty: 1,
-                question: "How many 'comparability factors' does the OECD identify that must be considered in a comparability analysis?",
-                options: ["Three", "Five", "Seven", "Two"],
-                correct: 1,
-                explanation: "The 5 factors are: 1. Characteristics of property/services, 2. Functional analysis, 3. Contractual terms, 4. Economic circumstances, 5. Business strategies."
-            },
-            {
-                id: 7,
-                chapter: "Chapter III",
-                difficulty: 3,
-                question: "Regarding 'timing issues' in comparability, what is the OECD's stance on using data from years following the transaction (hindsight)?",
-                options: ["It is mandatory for accuracy", "It should never be used under any circumstances", "It should generally be avoided, as pricing must be based on information available at the time", "It is the preferred method for financial transactions"],
-                correct: 2,
-                explanation: "Taxpayers are expected to determine prices based on information reasonably available at the time. Hindsight should generally be avoided, though ex-post outcomes can sometimes inform the assessment of ex-ante risk assumptions (e.g., HTVI)."
-            },
-            {
-                id: 8,
-                chapter: "Chapter IV",
-                difficulty: 2,
-                question: "What is the primary purpose of a 'Safe Harbour' in transfer pricing administration?",
-                options: ["To eliminate all taxes for small companies", "To reduce compliance burdens and provide certainty for simpler transactions", "To allow tax authorities to arbitrarily adjust prices", "To replace the arm's length principle entirely"],
-                correct: 1,
-                explanation: "Safe harbours are administrative simplification measures that relieve taxpayers from certain obligations (like complex benchmarking) if they meet specific criteria."
-            },
-            {
-                id: 9,
-                chapter: "Chapter IV",
-                difficulty: 2,
-                question: "Which dispute resolution mechanism involves an agreement between taxpayers and one or more tax administrations ahead of the transactions?",
-                options: ["Mutual Agreement Procedure (MAP)", "Advance Pricing Arrangement (APA)", "Simultaneous Tax Examination", "Arbitration"],
-                correct: 1,
-                explanation: "An APA determines, in advance of controlled transactions, an appropriate set of criteria (e.g., method, comparables) for determining the transfer pricing."
-            },
-            {
-                id: 10,
-                chapter: "Chapter V",
-                difficulty: 1,
-                question: "The OECD's three-tiered approach to documentation includes the Master File, Country-by-Country Report, and what else?",
-                options: ["Global File", "Local File", "Regional File", "Transaction File"],
-                correct: 1,
-                explanation: "The three tiers are: 1. Master File (global overview), 2. Local File (detailed local transaction analysis), 3. CbC Report."
-            },
-            {
-                id: 11,
-                chapter: "Chapter VI",
-                difficulty: 2,
-                question: "Legal ownership of an intangible solely...",
-                options: ["Entitles the owner to all residual returns", "Does not necessarily confer a right to all returns from the intangible", "Is irrelevant for transfer pricing", "Guarantees a risk-free return"],
-                correct: 1,
-                explanation: "Legal ownership is the starting point, but the return is allocated based on functions performed (DEMPE), assets used, and risks assumed. The legal owner might only get a risk-free return if they don't perform these functions."
-            },
-            {
-                id: 12,
-                chapter: "Chapter VI",
-                difficulty: 3,
-                question: "What does the acronym 'DEMPE' stand for regarding intangibles?",
-                options: ["Development, Enhancement, Maintenance, Protection, Exploitation", "Design, Engineering, Manufacturing, Production, Export", "Development, Earnings, Management, Planning, Equity", "Direct, External, Managed, Protected, Economic"],
-                correct: 0,
-                explanation: "DEMPE functions (Development, Enhancement, Maintenance, Protection, Exploitation) are crucial for attributing returns to intangibles."
-            },
-            {
-                id: 13,
-                chapter: "Chapter VII",
-                difficulty: 2,
-                question: "What is the 'Benefit Test' in the context of intra-group services?",
-                options: ["Whether the service provider made a profit", "Whether the group as a whole benefited", "Whether the activity provides economic or commercial value to the recipient that they would have paid for or performed themselves", "Whether the service is documented in the Master File"],
-                correct: 2,
-                explanation: "The benefit test determines if an intra-group service has been rendered. It asks if an independent party would have been willing to pay for the activity or perform it in-house."
-            },
-            {
-                id: 14,
-                chapter: "Chapter VII",
-                difficulty: 3,
-                question: "For 'Low Value-Adding Intra-Group Services', what mark-up does the OECD guidelines generally recommend as an arm's length charge?",
-                options: ["0% (Cost only)", "5%", "10%", "15%"],
-                correct: 1,
-                explanation: "The elective simplified approach for low value-adding intra-group services allows for a 5% mark-up on relevant costs without a detailed benchmarking study."
-            },
-            {
-                id: 15,
-                chapter: "Chapter VIII",
-                difficulty: 2,
-                question: "In a CCA, participants share contributions in proportion to what?",
-                options: ["Their head count", "Their global revenue", "Their share of expected benefits", "Their equity ownership"],
-                correct: 2,
-                explanation: "A key principle of a CCA is that each participant's share of contributions must be consistent with their proportionate share of the overall expected benefits."
-            },
-            {
-                id: 16,
-                chapter: "Chapter IX",
-                difficulty: 2,
-                question: "Does the OECD generally require compensation solely because a business restructuring reduces the profit potential of a group member?",
-                options: ["Yes, lost profit always requires compensation", "No, profit potential is not an asset, compensation depends on the transfer of something of value (rights, assets)", "Yes, but only if the reduction is >50%", "No, restructurings are tax-neutral"],
-                correct: 1,
-                explanation: "The Guidelines state that the restructuring itself is not necessarily a taxable event. Compensation is required if the restructuring involves the transfer of something of value (assets, ongoing concern) or the termination of rights that an independent party would be compensated for."
-            },
-            {
-                id: 17,
-                chapter: "Chapter X",
-                difficulty: 1,
-                question: "Which chapter was added/consolidated in the 2022 guidelines to specifically address financial transactions?",
-                options: ["Chapter VIII", "Chapter IX", "Chapter X", "Chapter V"],
-                correct: 2,
-                explanation: "Chapter X provides guidance on transfer pricing aspects of financial transactions, including loans, guarantees, and cash pooling."
-            },
-            {
-                id: 18,
-                chapter: "Chapter X",
-                difficulty: 3,
-                question: "When analyzing an intra-group loan, if the borrower does not have the financial capacity to service the debt, the tax authority may...",
-                options: ["Increase the interest rate", "Recharacterize the transaction as equity", "Ignore the transaction completely", "Apply a penalty tax"],
-                correct: 1,
-                explanation: "If a borrower lacks the capacity to service the debt (interest and principal), the guidance allows for recharacterization of the purported loan (or a portion of it) as a contribution to equity."
-            }
-        ];
+        // --- Question Bank (EMPTY) ---
+        const localQuestions = []; 
 
         // --- UI Elements ---
         const ui = {
@@ -389,14 +211,16 @@
             if (state.apiKey) {
                 ui.apiKeyInput.value = state.apiKey;
                 
-                // Visual adjustments if hardcoded
                 if (typeof HARDCODED_API_KEY !== 'undefined' && HARDCODED_API_KEY) {
-                    ui.apiKeyInput.disabled = true; // Prevent editing if hardcoded
+                    ui.apiKeyInput.disabled = true; 
                     const helpText = ui.apiKeyInput.nextElementSibling;
                     if (helpText) {
-                        helpText.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded successfully from source code.</span>";
+                        helpText.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded successfully.</span>";
                     }
                 }
+            } else {
+                // Open settings immediately if no key
+                setTimeout(() => ui.settingsModal.classList.remove('hidden'), 500);
             }
 
             // Setup listeners
@@ -423,7 +247,6 @@
             ui.closeSettingsBtn.addEventListener('click', () => ui.settingsModal.classList.add('hidden'));
             ui.saveSettingsBtn.addEventListener('click', saveSettings);
 
-            // Close modal on background click
             ui.settingsModal.addEventListener('click', (e) => {
                 if (e.target === ui.settingsModal) ui.settingsModal.classList.add('hidden');
             });
@@ -438,7 +261,8 @@
             state.apiKey = key;
             localStorage.setItem('oecd_quiz_api_key', key);
             ui.settingsModal.classList.add('hidden');
-            showToast(key ? "API Key Saved!" : "Using Offline Mode", "success");
+            showToast("Settings Saved", "success");
+            loadQuestion(); // Reload to try utilizing the key
         }
 
         function toggleManualModeUI() {
@@ -459,37 +283,45 @@
             ui.difficultyBadge.innerText = labels[state.difficulty];
         }
 
-        // --- Question Generation (AI vs Local) ---
+        // --- Question Generation (AI Only) ---
 
         async function loadQuestion() {
-            // Reset UI
+            // UI Reset
             ui.feedbackSection.classList.add('hidden');
             ui.optionsContainer.innerHTML = '';
             ui.optionsContainer.classList.remove('pointer-events-none');
             ui.loadingOverlay.classList.remove('hidden');
             
-            // Determine Source
-            if (state.apiKey) {
-                try {
-                    currentQuestion = await fetchQuestionFromAI();
-                    state.isUsingAI = true;
-                    ui.aiIndicator.classList.remove('hidden');
-                } catch (error) {
-                    console.error("AI Fetch Error:", error);
-                    showToast("AI Error - Using Local Backup", "warning");
-                    currentQuestion = getLocalQuestion();
-                    state.isUsingAI = false;
-                    ui.aiIndicator.classList.add('hidden');
-                }
-            } else {
-                currentQuestion = getLocalQuestion();
-                state.isUsingAI = false;
-                ui.aiIndicator.classList.add('hidden');
+            // CHECK IF API KEY EXISTS
+            if (!state.apiKey) {
+                ui.loadingOverlay.classList.add('hidden');
+                ui.chapterTag.innerText = "Setup Required";
+                ui.questionText.innerText = "API Key Missing";
+                ui.optionsContainer.innerHTML = `
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                        <i class="fas fa-key text-blue-400 text-3xl mb-3"></i>
+                        <p class="text-slate-700 mb-4">You have removed the local question bank. An API Key is now required to generate questions.</p>
+                        <button onclick="document.getElementById('settings-modal').classList.remove('hidden')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                            Open Settings
+                        </button>
+                    </div>
+                `;
+                return;
             }
 
-            // Render
+            try {
+                currentQuestion = await fetchQuestionFromAI();
+                state.isUsingAI = true;
+                ui.aiIndicator.classList.remove('hidden');
+            } catch (error) {
+                console.error("AI Error:", error);
+                ui.loadingOverlay.classList.add('hidden');
+                ui.questionText.innerText = "Error Generating Question";
+                ui.optionsContainer.innerHTML = `<div class="text-red-600 bg-red-50 p-4 rounded border border-red-200">${error.message}. Please check your API Key.</div>`;
+                return;
+            }
+
             renderQuestion();
-            
             ui.loadingOverlay.classList.add('hidden');
             
             state.questionCount++;
@@ -498,19 +330,14 @@
             ui.progressBar.style.width = `${progress}%`;
         }
 
-        function getLocalQuestion() {
-            // Filter by difficulty
-            let pool = localQuestions.filter(q => q.difficulty === state.difficulty);
-            if (pool.length === 0) pool = localQuestions; // Fallback
-            const randomIndex = Math.floor(Math.random() * pool.length);
-            return pool[randomIndex];
-        }
-
         async function fetchQuestionFromAI() {
             const difficultyText = state.difficulty === 1 ? "Beginner (Definitions, basic concepts)" : 
                                    state.difficulty === 2 ? "Intermediate (Application of methods, specific rules)" : 
                                    "Advanced (Nuanced scenarios, exceptions, complex analysis)";
             
+            // Random ID to prevent collision logic errors (though collision is unlikely with AI)
+            const randomId = Math.floor(Math.random() * 1000000);
+
             const prompt = `
                 You are an expert on the OECD Transfer Pricing Guidelines 2022.
                 Generate a single multiple-choice question based on Chapters I-X (excluding Annexes).
@@ -525,44 +352,47 @@
                     "explanation": "Brief explanation referencing the guidelines."
                 }
                 ensure "correct" is the integer index (0-3) of the correct option.
+                Make the question varied and specific. Avoid repeating generic definitions.
             `;
 
-            try {
-                // Updated to use the compatible model version for this environment
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${state.apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
-                    })
-                });
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${state.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
 
-                if (!response.ok) {
-                    console.error("API Error Details:", response.status, response.statusText);
-                    throw new Error(`API Request Failed: ${response.status}`);
-                }
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
-                const data = await response.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                
-                if (!text) throw new Error("No content generated by AI");
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (!text) throw new Error("No content generated");
 
-                // Clean markdown code blocks if present
-                const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                return JSON.parse(jsonStr);
-            } catch (e) {
-                throw e; // Re-throw to be caught by loadQuestion
-            }
+            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const q = JSON.parse(jsonStr);
+            q.id = randomId; // Assign ID
+            return q;
         }
 
         function renderQuestion() {
-            ui.chapterTag.innerText = currentQuestion.chapter || "General";
+            ui.chapterTag.innerText = currentQuestion.chapter;
             ui.questionText.innerText = currentQuestion.question;
-
+            
             currentQuestion.options.forEach((opt, index) => {
                 const btn = document.createElement('button');
-                btn.className = `btn-option w-full text-left p-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-blue-300 transition-all duration-200 font-medium text-slate-700`;
-                btn.innerText = opt;
+                btn.className = "btn-option w-full text-left p-4 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 relative group bg-white";
+                
+                btn.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold text-sm mr-3 group-hover:bg-blue-200 group-hover:text-blue-700 transition-colors">
+                            ${String.fromCharCode(65 + index)}
+                        </span>
+                        <span class="flex-grow">${opt}</span>
+                    </div>
+                `;
+                
                 btn.onclick = () => handleAnswer(index, btn);
                 ui.optionsContainer.appendChild(btn);
             });
@@ -570,108 +400,105 @@
 
         function handleAnswer(selectedIndex, btnElement) {
             ui.optionsContainer.classList.add('pointer-events-none');
-
+            
             const isCorrect = selectedIndex === currentQuestion.correct;
-            const allBtns = ui.optionsContainer.querySelectorAll('button');
+            const correctBtn = ui.optionsContainer.children[currentQuestion.correct];
 
-            // Visual Feedback
-            if (allBtns[currentQuestion.correct]) {
-                allBtns[currentQuestion.correct].classList.add('bg-green-100', 'border-green-500', 'text-green-800');
-                allBtns[currentQuestion.correct].innerHTML += ' <i class="fas fa-check float-right mt-1"></i>';
-            }
-
-            if (!isCorrect) {
-                btnElement.classList.add('bg-red-100', 'border-red-500', 'text-red-800');
-                btnElement.innerHTML += ' <i class="fas fa-times float-right mt-1"></i>';
-            }
-
-            updateScore(isCorrect);
-            updateDifficultyState(isCorrect);
-            showFeedback(isCorrect);
-        }
-
-        function updateScore(isCorrect) {
+            // Update State
             if (isCorrect) {
-                state.score += (10 * state.difficulty);
+                state.score += 10 + (state.streak * 2);
                 state.streak++;
-                ui.streakIcon.classList.add('streak-fire');
-            } else {
-                state.streak = 0;
-                ui.streakIcon.classList.remove('streak-fire');
-            }
-            animateValue(ui.score, parseInt(ui.score.innerText), state.score, 500);
-            ui.streak.innerText = state.streak;
-        }
-
-        function updateDifficultyState(isCorrect) {
-            if (state.isManualMode) return;
-
-            if (isCorrect) {
                 state.consecutiveCorrect++;
                 state.consecutiveWrong = 0;
+                
+                // Visuals
+                btnElement.classList.remove('bg-white', 'border-slate-200');
+                btnElement.classList.add('bg-green-100', 'border-green-500', 'text-green-900');
+                
+                showFeedback(true, "Correct!", currentQuestion.explanation);
+            } else {
+                state.streak = 0;
+                state.consecutiveCorrect = 0;
+                state.consecutiveWrong++;
+
+                // Visuals
+                btnElement.classList.remove('bg-white', 'border-slate-200');
+                btnElement.classList.add('bg-red-100', 'border-red-500', 'text-red-900');
+                
+                // Highlight correct one
+                correctBtn.classList.remove('bg-white', 'border-slate-200');
+                correctBtn.classList.add('bg-green-100', 'border-green-500', 'text-green-900');
+
+                showFeedback(false, "Incorrect", currentQuestion.explanation);
+            }
+
+            // Adjust Difficulty (Auto Mode)
+            if (!state.isManualMode) {
                 if (state.consecutiveCorrect >= 3 && state.difficulty < 3) {
                     state.difficulty++;
                     state.consecutiveCorrect = 0;
-                    showToast("Difficulty Increased!", "success");
-                }
-            } else {
-                state.consecutiveCorrect = 0;
-                state.consecutiveWrong++;
-                if (state.consecutiveWrong >= 2 && state.difficulty > 1) {
+                    showToast("Level Up! Difficulty Increased.", "success");
+                } else if (state.consecutiveWrong >= 2 && state.difficulty > 1) {
                     state.difficulty--;
                     state.consecutiveWrong = 0;
-                    showToast("Difficulty Decreased", "warning");
+                    showToast("Difficulty Decreased.", "info");
                 }
             }
+
+            // Update Header Stats
+            ui.score.innerText = state.score;
+            ui.streak.innerText = state.streak;
+            
+            if (state.streak > 2) {
+                ui.streakIcon.classList.add('streak-fire');
+            } else {
+                ui.streakIcon.classList.remove('streak-fire');
+            }
+            
             updateDifficultyUI();
         }
 
-        function showFeedback(isCorrect) {
+        function showFeedback(isCorrect, title, text) {
             ui.feedbackSection.classList.remove('hidden');
-            ui.feedbackSection.classList.add('fade-in');
-
+            ui.feedbackTitle.innerText = title;
+            ui.feedbackText.innerText = text;
+            
             if (isCorrect) {
                 ui.feedbackIcon.className = "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white bg-green-500";
                 ui.feedbackIcon.innerHTML = '<i class="fas fa-check"></i>';
-                ui.feedbackTitle.innerText = "Correct!";
                 ui.feedbackTitle.className = "text-lg font-bold text-green-700";
             } else {
                 ui.feedbackIcon.className = "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white bg-red-500";
                 ui.feedbackIcon.innerHTML = '<i class="fas fa-times"></i>';
-                ui.feedbackTitle.innerText = "Incorrect";
                 ui.feedbackTitle.className = "text-lg font-bold text-red-700";
             }
-            ui.feedbackText.innerText = currentQuestion.explanation;
-        }
-
-        function animateValue(obj, start, end, duration) {
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                obj.innerHTML = Math.floor(progress * (end - start) + start);
-                if (progress < 1) {
-                    window.requestAnimationFrame(step);
-                }
-            };
-            window.requestAnimationFrame(step);
-        }
-
-        function showToast(message, type) {
-            const badge = ui.difficultyBadge;
-            const originalText = badge.innerText;
-            const originalColor = badge.className;
             
-            badge.innerText = message;
-            if(type === 'success') badge.className = "px-2 py-1 rounded font-bold text-xs bg-green-600 text-white shadow-lg transform scale-110 transition";
-            if(type === 'warning') badge.className = "px-2 py-1 rounded font-bold text-xs bg-yellow-500 text-white shadow-lg transform scale-110 transition";
-
-            setTimeout(() => {
-                updateDifficultyUI();
-            }, 2000);
+            // Scroll to feedback
+            ui.feedbackSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        function showToast(message, type = "info") {
+            const toast = document.createElement('div');
+            const colors = type === "success" ? "bg-green-600" : type === "warning" ? "bg-orange-500" : "bg-blue-600";
+            toast.className = `fixed bottom-4 right-4 ${colors} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-y-10 opacity-0 z-50 font-medium`;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            });
+
+            // Remove
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Init
         init();
+
     </script>
 </body>
 </html>
