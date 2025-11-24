@@ -133,8 +133,8 @@
                 <label class="block text-sm font-medium text-slate-700 mb-2">Google Gemini API Key</label>
                 <input type="password" id="api-key-input" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Enter your API Key here...">
                 <p class="text-xs text-slate-500 mt-2">
-                    An API Key is required to generate questions. 
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Get a key here.</a>
+                    An API Key is required. 
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Get a free key here.</a>
                 </p>
             </div>
 
@@ -153,7 +153,8 @@
 
     <script>
         // --- USER CONFIGURATION ---
-        const HARDCODED_API_KEY = "AIzaSyABDqPKFLzetjIRlD_G8Iln66DmTR3IiNE"; 
+        // 🚨 IMPORTANT: REPLACE "YOUR_API_KEY_HERE" with your actual Gemini API Key
+        const HARDCODED_API_KEY = "YOUR_API_KEY_HERE"; 
 
         // --- Configuration & State ---
         const state = {
@@ -164,13 +165,43 @@
             questionCount: 0,
             consecutiveCorrect: 0,
             consecutiveWrong: 0,
-            apiKey: HARDCODED_API_KEY || localStorage.getItem('oecd_quiz_api_key') || '',
+            // Prioritize hardcoded key, then local storage, then empty string
+            apiKey: HARDCODED_API_KEY !== "AIzaSyABDqPKFLzetjIRlD_G8Iln66DmTR3IiNE" ? HARDCODED_API_KEY : localStorage.getItem('oecd_quiz_api_key') || '',
             isUsingAI: false,
-            seenQuestions: [] // Tracks IDs
+            lastTopic: "" 
         };
 
-        // --- Question Bank (EMPTY) ---
-        const localQuestions = []; 
+        // --- Question Topic Randomizer ---
+        const topicsByDifficulty = {
+            1: [ // Beginner
+                "Definition of Associated Enterprises",
+                "The definition of the Arm's Length Principle (Article 9)",
+                "The 5 Comparability Factors",
+                "Functional Analysis (Functions, Assets, Risks)",
+                "Purpose of Transfer Pricing Documentation",
+                "Master File vs Local File basics",
+                "Safe Harbours (General Concept)"
+            ],
+            2: [ // Intermediate
+                "Selection of the Most Appropriate Method",
+                "CUP Method (Comparable Uncontrolled Price) specific requirements",
+                "Resale Price Method mechanics",
+                "Cost Plus Method mechanics",
+                "TNMM (Transactional Net Margin Method) application",
+                "Transactional Profit Split Method: Contribution vs Residual analysis",
+                "Intangibles: Legal ownership vs Economic substance",
+                "Intra-group services: Benefit test"
+            ],
+            3: [ // Advanced
+                "Hard-to-value intangibles (HTVI) approach",
+                "DEMPE functions (Development, Enhancement, Maintenance, Protection, Exploitation)",
+                "Financial Transactions (Treasury functions, Guarantees, Cash pooling)",
+                "Business Restructurings (Chapter IX)",
+                "Cost Contribution Arrangements (CCAs)",
+                "Attribution of Profits to Permanent Establishments",
+                "Advance Pricing Arrangements (APAs) & MAP"
+            ]
+        };
 
         // --- UI Elements ---
         const ui = {
@@ -211,11 +242,12 @@
             if (state.apiKey) {
                 ui.apiKeyInput.value = state.apiKey;
                 
-                if (typeof HARDCODED_API_KEY !== 'undefined' && HARDCODED_API_KEY) {
+                if (HARDCODED_API_KEY !== "YOUR_API_KEY_HERE" && state.apiKey === HARDCODED_API_KEY) {
+                    // If hardcoded key is actually set, disable input
                     ui.apiKeyInput.disabled = true; 
                     const helpText = ui.apiKeyInput.nextElementSibling;
                     if (helpText) {
-                        helpText.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded successfully.</span>";
+                        helpText.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded from code.</span>";
                     }
                 }
             } else {
@@ -262,7 +294,7 @@
             localStorage.setItem('oecd_quiz_api_key', key);
             ui.settingsModal.classList.add('hidden');
             showToast("Settings Saved", "success");
-            loadQuestion(); // Reload to try utilizing the key
+            loadQuestion(); 
         }
 
         function toggleManualModeUI() {
@@ -300,7 +332,7 @@
                 ui.optionsContainer.innerHTML = `
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
                         <i class="fas fa-key text-blue-400 text-3xl mb-3"></i>
-                        <p class="text-slate-700 mb-4">You have removed the local question bank. An API Key is now required to generate questions.</p>
+                        <p class="text-slate-700 mb-4">An API Key is required to generate questions. Please open Settings.</p>
                         <button onclick="document.getElementById('settings-modal').classList.remove('hidden')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
                             Open Settings
                         </button>
@@ -317,7 +349,10 @@
                 console.error("AI Error:", error);
                 ui.loadingOverlay.classList.add('hidden');
                 ui.questionText.innerText = "Error Generating Question";
-                ui.optionsContainer.innerHTML = `<div class="text-red-600 bg-red-50 p-4 rounded border border-red-200">${error.message}. Please check your API Key.</div>`;
+                ui.optionsContainer.innerHTML = `<div class="text-red-600 bg-red-50 p-4 rounded border border-red-200">
+                    <strong>API or Network Error:</strong> ${error.message}<br><br>
+                    Please ensure your API Key is correct and that you have credit on your account.
+                </div>`;
                 return;
             }
 
@@ -331,31 +366,44 @@
         }
 
         async function fetchQuestionFromAI() {
-            const difficultyText = state.difficulty === 1 ? "Beginner (Definitions, basic concepts)" : 
-                                   state.difficulty === 2 ? "Intermediate (Application of methods, specific rules)" : 
-                                   "Advanced (Nuanced scenarios, exceptions, complex analysis)";
+            const difficultyText = state.difficulty === 1 ? "Beginner" : 
+                                   state.difficulty === 2 ? "Intermediate" : 
+                                   "Advanced";
             
-            // Random ID to prevent collision logic errors (though collision is unlikely with AI)
-            const randomId = Math.floor(Math.random() * 1000000);
+            // --- RANDOM TOPIC SELECTION LOGIC ---
+            const availableTopics = topicsByDifficulty[state.difficulty];
+            let randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
+            
+            if (randomTopic === state.lastTopic) {
+                // Rerandomize if it picks the same topic twice in a row
+                randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
+            }
+            state.lastTopic = randomTopic;
 
             const prompt = `
                 You are an expert on the OECD Transfer Pricing Guidelines 2022.
-                Generate a single multiple-choice question based on Chapters I-X (excluding Annexes).
-                Difficulty Level: ${difficultyText}.
-                Return ONLY valid JSON in this exact format:
+                Generate a multiple-choice question.
+                
+                DIFFICULTY: ${difficultyText}
+                TOPIC FOCUS: ${randomTopic}
+                
+                Requirements:
+                1. Create a question strictly related to the "Topic Focus" above.
+                2. Do NOT ask generic definitions if possible, try to create a small scenario or specific rule application.
+                3. Provide 4 options.
+                4. Return ONLY valid JSON (no markdown formatting or explanation text outside the JSON block).
+                
+                JSON Format:
                 {
-                    "chapter": "Chapter [Number]",
-                    "difficulty": ${state.difficulty},
-                    "question": "The question text here?",
-                    "options": ["Option A", "Option B", "Option C", "Option D"],
-                    "correct": 0,
+                    "chapter": "Chapter [Roman Numeral, e.g., Chapter I]",
+                    "question": "Question text...",
+                    "options": ["A", "B", "C", "D"],
+                    "correct": 0, // Integer index 0-3
                     "explanation": "Brief explanation referencing the guidelines."
                 }
-                ensure "correct" is the integer index (0-3) of the correct option.
-                Make the question varied and specific. Avoid repeating generic definitions.
             `;
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${state.apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -363,16 +411,19 @@
                 })
             });
 
-            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error.message || `HTTP Error ${response.status}`);
+            }
 
             const data = await response.json();
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
             
-            if (!text) throw new Error("No content generated");
+            if (!text) throw new Error("No content generated by AI.");
 
+            // Safely parse JSON, removing any markdown code block wrappers the model might add
             const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
             const q = JSON.parse(jsonStr);
-            q.id = randomId; // Assign ID
             return q;
         }
 
@@ -426,8 +477,10 @@
                 btnElement.classList.add('bg-red-100', 'border-red-500', 'text-red-900');
                 
                 // Highlight correct one
-                correctBtn.classList.remove('bg-white', 'border-slate-200');
-                correctBtn.classList.add('bg-green-100', 'border-green-500', 'text-green-900');
+                if (correctBtn) {
+                    correctBtn.classList.remove('bg-white', 'border-slate-200');
+                    correctBtn.classList.add('bg-green-100', 'border-green-500', 'text-green-900');
+                }
 
                 showFeedback(false, "Incorrect", currentQuestion.explanation);
             }
