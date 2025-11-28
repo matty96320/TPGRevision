@@ -153,9 +153,9 @@
 
     <script>
         // --- USER CONFIGURATION ---
-        // 🚨 IMPORTANT: REPLACE "YOUR_API_KEY_HERE" with your actual Gemini API Key
-        const HARDCODED_API_KEY = "AIzaSyABDqPKFLzetjIRlD_G8Iln66DmTR3IiNE"; 
-        const PLACEHOLDER_KEY = "AIzaSyABDqPKFLzetjIRlD_G8Iln66DmTR3IiNE"; // Used to check if user updated it
+        // 🚨 IMPORTANT: You can replace "YOUR_API_KEY_HERE" below, OR use the Settings button in the app
+        const HARDCODED_API_KEY = "YOUR_API_KEY_HERE"; 
+        const PLACEHOLDER_KEY = "YOUR_API_KEY_HERE"; 
 
         // --- Configuration & State ---
         const state = {
@@ -166,7 +166,7 @@
             questionCount: 0,
             consecutiveCorrect: 0,
             consecutiveWrong: 0,
-            // Logic fixed: Prefer Hardcoded if it's not the placeholder. Otherwise look in local storage.
+            // Priority: 1. Hardcoded (if changed) 2. Local Storage
             apiKey: (HARDCODED_API_KEY && HARDCODED_API_KEY !== PLACEHOLDER_KEY) 
                     ? HARDCODED_API_KEY 
                     : (localStorage.getItem('oecd_quiz_api_key') || ''),
@@ -242,7 +242,11 @@
         // --- Logic ---
 
         function init() {
-            // Restore API key logic
+            // FIX: Always setup listeners first, so the Settings button works even if no key exists
+            setupEventListeners();
+            updateDifficultyUI();
+
+            // Check if key exists
             if (state.apiKey) {
                 ui.apiKeyInput.value = state.apiKey;
                 
@@ -251,25 +255,27 @@
                     ui.apiKeyInput.disabled = true; 
                     ui.apiHelp.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded from code.</span>";
                 }
-            } else {
-                // If no key found, we cannot start. Wait for user to input in settings.
-                ui.questionText.innerText = "Welcome";
-                ui.optionsContainer.innerHTML = `<p class="text-slate-500 mb-4">Please enter your API Key in settings to begin.</p>
-                <button id="start-setup-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Open Settings</button>`;
-                
-                document.getElementById('start-setup-btn').addEventListener('click', () => ui.settingsModal.classList.remove('hidden'));
-                
-                setTimeout(() => ui.settingsModal.classList.remove('hidden'), 500);
-                return; // Stop initialization until key is set
-            }
 
-            setupEventListeners();
-            
-            // Start if we have a key
-            if(state.apiKey) {
+                // Start!
                 loadQuestion();
+            } else {
+                // If no key found, prompt user
+                ui.questionText.innerText = "Welcome";
+                ui.optionsContainer.innerHTML = `
+                    <div class="bg-blue-50 p-6 rounded-lg text-center border border-blue-100">
+                        <i class="fas fa-key text-blue-400 text-3xl mb-3"></i>
+                        <p class="text-slate-600 mb-4">Please enter your Gemini API Key in settings to begin.</p>
+                        <button id="start-setup-btn" class="px-6 py-2 bg-blue-600 text-white font-medium rounded-full hover:bg-blue-700 transition shadow-md">
+                            Open Settings
+                        </button>
+                    </div>`;
+                
+                // Add listener to this specific temporary button
+                setTimeout(() => {
+                    const btn = document.getElementById('start-setup-btn');
+                    if(btn) btn.onclick = () => ui.settingsModal.classList.remove('hidden');
+                }, 100);
             }
-            updateDifficultyUI();
         }
 
         function setupEventListeners() {
@@ -304,7 +310,7 @@
         function saveSettings() {
             const key = ui.apiKeyInput.value.trim();
             if(!key) {
-                alert("Please enter a key.");
+                alert("Please paste your API Key.");
                 return;
             }
             state.apiKey = key;
@@ -312,11 +318,8 @@
             ui.settingsModal.classList.add('hidden');
             showToast("Settings Saved", "success");
             
-            // If this is the first load
-            if(state.questionCount === 0) {
-                setupEventListeners(); // Ensure listeners are active if they weren't before
-                loadQuestion();
-            }
+            // Reload the question now that we have a key
+            loadQuestion();
         }
 
         function toggleManualModeUI() {
@@ -346,21 +349,10 @@
             ui.optionsContainer.classList.remove('pointer-events-none');
             ui.loadingOverlay.classList.remove('hidden');
             
-            // CHECK IF API KEY EXISTS OR IS STILL PLACEHOLDER
+            // Double check API Key
             if (!state.apiKey || state.apiKey === PLACEHOLDER_KEY) {
                 ui.loadingOverlay.classList.add('hidden');
-                ui.chapterTag.innerText = "Setup Required";
-                ui.questionText.innerText = "API Key Missing";
-                ui.optionsContainer.innerHTML = `
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                        <i class="fas fa-key text-blue-400 text-3xl mb-3"></i>
-                        <p class="text-slate-700 mb-4">An API Key is required to generate questions. Please open Settings.</p>
-                        <button onclick="document.getElementById('settings-modal').classList.remove('hidden')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
-                            Open Settings
-                        </button>
-                    </div>
-                `;
-                return;
+                return; // Stop if still no key
             }
 
             try {
@@ -370,12 +362,10 @@
             } catch (error) {
                 console.error("AI Error:", error);
                 ui.loadingOverlay.classList.add('hidden');
-                ui.questionText.innerText = "Error Generating Question";
+                ui.questionText.innerText = "Connection Error";
                 ui.optionsContainer.innerHTML = `<div class="text-red-600 bg-red-50 p-4 rounded border border-red-200">
-                    <strong>API Error:</strong> ${error.message}<br><br>
-                    1. Check your internet connection.<br>
-                    2. Check your API Key in settings.<br>
-                    3. Ensure your Google AI Studio account has free tier access.
+                    <strong>Could not get question:</strong> ${error.message}<br><br>
+                    Please check your API Key in Settings.
                 </div>`;
                 return;
             }
@@ -445,8 +435,6 @@
             if (!text) throw new Error("No content generated by AI.");
 
             // FIX: Robust JSON Extraction
-            // Sometimes models return "Here is your JSON: ```json ... ```"
-            // We find the first '{' and the last '}' to extract just the object.
             let jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
             const firstBrace = jsonString.indexOf('{');
             const lastBrace = jsonString.lastIndexOf('}');
@@ -459,8 +447,7 @@
                 const q = JSON.parse(jsonString);
                 return q;
             } catch (e) {
-                console.error("JSON Parse Error", text);
-                throw new Error("Failed to parse AI response. Try again.");
+                throw new Error("Failed to parse AI response.");
             }
         }
 
@@ -563,7 +550,6 @@
                 ui.feedbackTitle.className = "text-lg font-bold text-red-700";
             }
             
-            // Scroll to feedback
             ui.feedbackSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
@@ -574,12 +560,10 @@
             toast.innerText = message;
             document.body.appendChild(toast);
             
-            // Animate in
             requestAnimationFrame(() => {
                 toast.classList.remove('translate-y-10', 'opacity-0');
             });
 
-            // Remove
             setTimeout(() => {
                 toast.classList.add('translate-y-10', 'opacity-0');
                 setTimeout(() => toast.remove(), 300);
