@@ -132,7 +132,7 @@
             <div class="mb-6">
                 <label class="block text-sm font-medium text-slate-700 mb-2">Google Gemini API Key</label>
                 <input type="password" id="api-key-input" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Enter your API Key here...">
-                <p class="text-xs text-slate-500 mt-2">
+                <p id="api-input-help" class="text-xs text-slate-500 mt-2">
                     An API Key is required. 
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Get a free key here.</a>
                 </p>
@@ -155,6 +155,7 @@
         // --- USER CONFIGURATION ---
         // 🚨 IMPORTANT: REPLACE "YOUR_API_KEY_HERE" with your actual Gemini API Key
         const HARDCODED_API_KEY = "YOUR_API_KEY_HERE"; 
+        const PLACEHOLDER_KEY = "YOUR_API_KEY_HERE"; // Used to check if user updated it
 
         // --- Configuration & State ---
         const state = {
@@ -165,8 +166,10 @@
             questionCount: 0,
             consecutiveCorrect: 0,
             consecutiveWrong: 0,
-            // Prioritize hardcoded key, then local storage, then empty string
-            apiKey: HARDCODED_API_KEY !== "AIzaSyABDqPKFLzetjIRlD_G8Iln66DmTR3IiNE" ? HARDCODED_API_KEY : localStorage.getItem('oecd_quiz_api_key') || '',
+            // Logic fixed: Prefer Hardcoded if it's not the placeholder. Otherwise look in local storage.
+            apiKey: (HARDCODED_API_KEY && HARDCODED_API_KEY !== PLACEHOLDER_KEY) 
+                    ? HARDCODED_API_KEY 
+                    : (localStorage.getItem('oecd_quiz_api_key') || ''),
             isUsingAI: false,
             lastTopic: "" 
         };
@@ -229,6 +232,7 @@
             closeSettingsBtn: document.getElementById('close-settings'),
             saveSettingsBtn: document.getElementById('save-settings'),
             apiKeyInput: document.getElementById('api-key-input'),
+            apiHelp: document.getElementById('api-input-help'),
             loadingOverlay: document.getElementById('loading-overlay'),
             aiIndicator: document.getElementById('ai-indicator')
         };
@@ -238,25 +242,38 @@
         // --- Logic ---
 
         function init() {
-            // Restore API key
+            // Restore API key logic
             if (state.apiKey) {
                 ui.apiKeyInput.value = state.apiKey;
                 
-                if (HARDCODED_API_KEY !== "YOUR_API_KEY_HERE" && state.apiKey === HARDCODED_API_KEY) {
-                    // If hardcoded key is actually set, disable input
+                // If the key comes from the hardcode, lock the input to indicate it's set in code
+                if (HARDCODED_API_KEY !== PLACEHOLDER_KEY && state.apiKey === HARDCODED_API_KEY) {
                     ui.apiKeyInput.disabled = true; 
-                    const helpText = ui.apiKeyInput.nextElementSibling;
-                    if (helpText) {
-                        helpText.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded from code.</span>";
-                    }
+                    ui.apiHelp.innerHTML = "<span class='text-green-600 font-bold'><i class='fas fa-check-circle'></i> API Key loaded from code.</span>";
                 }
             } else {
-                // Open settings immediately if no key
+                // If no key found, we cannot start. Wait for user to input in settings.
+                ui.questionText.innerText = "Welcome";
+                ui.optionsContainer.innerHTML = `<p class="text-slate-500 mb-4">Please enter your API Key in settings to begin.</p>
+                <button id="start-setup-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Open Settings</button>`;
+                
+                document.getElementById('start-setup-btn').addEventListener('click', () => ui.settingsModal.classList.remove('hidden'));
+                
                 setTimeout(() => ui.settingsModal.classList.remove('hidden'), 500);
+                return; // Stop initialization until key is set
             }
 
-            // Setup listeners
-            ui.manualToggle.addEventListener('change', (e) => {
+            setupEventListeners();
+            
+            // Start if we have a key
+            if(state.apiKey) {
+                loadQuestion();
+            }
+            updateDifficultyUI();
+        }
+
+        function setupEventListeners() {
+             ui.manualToggle.addEventListener('change', (e) => {
                 state.isManualMode = e.target.checked;
                 toggleManualModeUI();
                 if (state.isManualMode) {
@@ -282,19 +299,24 @@
             ui.settingsModal.addEventListener('click', (e) => {
                 if (e.target === ui.settingsModal) ui.settingsModal.classList.add('hidden');
             });
-
-            // Start
-            loadQuestion();
-            updateDifficultyUI();
         }
 
         function saveSettings() {
             const key = ui.apiKeyInput.value.trim();
+            if(!key) {
+                alert("Please enter a key.");
+                return;
+            }
             state.apiKey = key;
             localStorage.setItem('oecd_quiz_api_key', key);
             ui.settingsModal.classList.add('hidden');
             showToast("Settings Saved", "success");
-            loadQuestion(); 
+            
+            // If this is the first load
+            if(state.questionCount === 0) {
+                setupEventListeners(); // Ensure listeners are active if they weren't before
+                loadQuestion();
+            }
         }
 
         function toggleManualModeUI() {
@@ -324,8 +346,8 @@
             ui.optionsContainer.classList.remove('pointer-events-none');
             ui.loadingOverlay.classList.remove('hidden');
             
-            // CHECK IF API KEY EXISTS
-            if (!state.apiKey) {
+            // CHECK IF API KEY EXISTS OR IS STILL PLACEHOLDER
+            if (!state.apiKey || state.apiKey === PLACEHOLDER_KEY) {
                 ui.loadingOverlay.classList.add('hidden');
                 ui.chapterTag.innerText = "Setup Required";
                 ui.questionText.innerText = "API Key Missing";
@@ -350,8 +372,10 @@
                 ui.loadingOverlay.classList.add('hidden');
                 ui.questionText.innerText = "Error Generating Question";
                 ui.optionsContainer.innerHTML = `<div class="text-red-600 bg-red-50 p-4 rounded border border-red-200">
-                    <strong>API or Network Error:</strong> ${error.message}<br><br>
-                    Please ensure your API Key is correct and that you have credit on your account.
+                    <strong>API Error:</strong> ${error.message}<br><br>
+                    1. Check your internet connection.<br>
+                    2. Check your API Key in settings.<br>
+                    3. Ensure your Google AI Studio account has free tier access.
                 </div>`;
                 return;
             }
@@ -375,7 +399,6 @@
             let randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
             
             if (randomTopic === state.lastTopic) {
-                // Rerandomize if it picks the same topic twice in a row
                 randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
             }
             state.lastTopic = randomTopic;
@@ -391,14 +414,14 @@
                 1. Create a question strictly related to the "Topic Focus" above.
                 2. Do NOT ask generic definitions if possible, try to create a small scenario or specific rule application.
                 3. Provide 4 options.
-                4. Return ONLY valid JSON (no markdown formatting or explanation text outside the JSON block).
+                4. Return ONLY valid JSON.
                 
                 JSON Format:
                 {
                     "chapter": "Chapter [Roman Numeral, e.g., Chapter I]",
                     "question": "Question text...",
                     "options": ["A", "B", "C", "D"],
-                    "correct": 0, // Integer index 0-3
+                    "correct": 0,
                     "explanation": "Brief explanation referencing the guidelines."
                 }
             `;
@@ -421,14 +444,28 @@
             
             if (!text) throw new Error("No content generated by AI.");
 
-            // Safely parse JSON, removing any markdown code block wrappers the model might add
-            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            const q = JSON.parse(jsonStr);
-            return q;
+            // FIX: Robust JSON Extraction
+            // Sometimes models return "Here is your JSON: ```json ... ```"
+            // We find the first '{' and the last '}' to extract just the object.
+            let jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const firstBrace = jsonString.indexOf('{');
+            const lastBrace = jsonString.lastIndexOf('}');
+            
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+            }
+
+            try {
+                const q = JSON.parse(jsonString);
+                return q;
+            } catch (e) {
+                console.error("JSON Parse Error", text);
+                throw new Error("Failed to parse AI response. Try again.");
+            }
         }
 
         function renderQuestion() {
-            ui.chapterTag.innerText = currentQuestion.chapter;
+            ui.chapterTag.innerText = currentQuestion.chapter || "OECD Guidelines";
             ui.questionText.innerText = currentQuestion.question;
             
             currentQuestion.options.forEach((opt, index) => {
